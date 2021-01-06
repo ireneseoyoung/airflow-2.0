@@ -1,0 +1,36 @@
+# docker-compose.override.yml
+
+version: "2"
+services:
+  webserver:
+    image: astronomerio/ap-airflow:2.0.0-buster-onbuild-22237
+    command: >
+      bash -c '{ airflow create_user "$$@" || airflow users create "$$@"; } && { airflow sync_perm || airflow sync-perm; } && airflow webserver' -- -r Admin -u admin -e admin@example.com -f admin -l user -p admin
+
+  scheduler:
+    image: astronomerio/ap-airflow:2.0.0-buster-onbuild-22237
+
+  scheduler-2:
+    image: astronomerio/ap-airflow:2.0.0-buster-onbuild-22237
+    command: >
+      bash -c "(airflow upgradedb || airflow db upgrade) && airflow scheduler"
+    restart: unless-stopped
+    networks:
+      - airflow
+    user: astro
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+      io.astronomer.docker.component: "airflow-scheduler"
+    depends_on:
+      - postgres
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
+    volumes:
+      - ./dags:/usr/local/airflow/dags:ro
+      - ./plugins:/usr/local/airflow/plugins:z
+      - ./include:/usr/local/airflow/include:z
+      - airflow_logs:/usr/local/airflow/logs
